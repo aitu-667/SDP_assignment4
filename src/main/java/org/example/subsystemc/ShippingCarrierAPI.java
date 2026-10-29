@@ -1,23 +1,32 @@
 package org.example.subsystemc;
 
-public class ShipmentRecord {
-    public enum Status { NEW, DISPATCHED, CANCELLED }
+import java.util.UUID;
 
-    private final String orderId;
-    private final String trackingNumber;
-    private Status status;
+public class ShippingCarrierAPI {
+    private final ShippingRepository repository;
+    private final PaymentGateway paymentGateway;
 
-    public ShipmentRecord(String orderId, String trackingNumber, Status status) {
-        this.orderId = orderId;
-        this.trackingNumber = trackingNumber;
-        this.status = status;
+    public ShippingCarrierAPI(ShippingRepository repository, PaymentGateway paymentGateway) {
+        this.repository = repository;
+        this.paymentGateway = paymentGateway;
     }
 
-    public String getOrderId() { return orderId; }
-    public String getTrackingNumber() { return trackingNumber; }
-    public Status getStatus() { return status; }
+    public String dispatchShipment(String orderId, double price) {
+        if (!paymentGateway.processPayment(price)) {
+            throw new IllegalArgumentException("Payment failed");
+        }
+        String tracking = "TRACK-" + UUID.randomUUID().toString().substring(0, 8);
+        ShipmentRecord record = new ShipmentRecord(orderId, tracking, ShipmentRecord.Status.NEW);
+        record.setStatus(ShipmentRecord.Status.DISPATCHED);
+        repository.save(record);
+        return tracking;
+    }
 
-    public void setStatus(Status status) {
-        this.status = status;
+    public void cancelShipment(String orderId) {
+        ShipmentRecord record = repository.findByOrderId(orderId);
+        if (record != null) {
+            record.setStatus(ShipmentRecord.Status.CANCELLED);
+            repository.save(record);
+        }
     }
 }
